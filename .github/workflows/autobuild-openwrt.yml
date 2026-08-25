@@ -251,25 +251,44 @@ jobs:
       - name: Advance the lock for sources that actually built
         run: |
           set -euo pipefail
-          [ -s upstream.lock ] || echo '{}' > upstream.lock
-          lock="$(cat upstream.lock)"
-          shopt -s nullglob
-          for f in lockbits/*.txt; do
-            id="$(cut -d' ' -f1 "$f")"
-            sha="$(cut -d' ' -f2 "$f")"
-            echo "recording $id -> ${sha:0:12}"
-            lock="$(printf '%s' "$lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
-          done
-          printf '%s\n' "$lock" | jq -S . > upstream.lock
 
-          # A source whose build failed keeps its old SHA on purpose: the next
-          # scheduled run then retries it instead of skipping it as "unchanged".
-          if [ -n "$(git status --porcelain upstream.lock)" ]; then
+          # A build window is hours long, so main has very likely moved since
+          # this job checked out. Rebuild the lock on top of whatever main is
+          # now and retry, rather than pushing a stale ref and failing.
+          # lockbits/ is untracked, so `reset --hard` leaves it alone.
+          for attempt in 1 2 3; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+
+            [ -s upstream.lock ] || echo '{}' > upstream.lock
+            lock="$(cat upstream.lock)"
+            shopt -s nullglob
+            for f in lockbits/*.txt; do
+              id="$(cut -d' ' -f1 "$f")"
+              sha="$(cut -d' ' -f2 "$f")"
+              echo "recording $id -> ${sha:0:12}"
+              lock="$(printf '%s' "$lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
+            done
+            printf '%s\n' "$lock" | jq -S . > upstream.lock
+
+            # A source whose build failed keeps its old SHA on purpose: the next
+            # scheduled run then retries it instead of skipping it as "unchanged".
+            if [ -z "$(git status --porcelain upstream.lock)" ]; then
+              echo 'lock already up to date'
+              exit 0
+            fi
+
             git config user.name  'github-actions[bot]'
             git config user.email 'github-actions[bot]@users.noreply.github.com'
             git add upstream.lock
-            git commit -m 'Record upstream commits for successful builds'
-            git push
-          else
-            echo 'lock unchanged'
-          fi
+            git commit -q -m 'Record upstream commits for successful builds'
+            if git push -q; then
+              echo 'lock pushed'
+              exit 0
+            fi
+            echo "push rejected, retrying ($attempt/3)"
+            sleep 5
+          done
+
+          echo '::error::could not push upstream.lock after 3 attempts'
+          exit 1
