@@ -1,0 +1,34 @@
+[
+  {
+    "id": "lede",
+    "title": "Lean's LEDE",
+    "repo": "https://github.com/coolsnowwolf/lede",
+    "branch": "master",
+    "config": "config/lede.config",
+    "diy1": "scripts/diy-lede-part1.sh"
+  },
+  {
+    "id": "immortalwrt",
+    "title": "ImmortalWrt",
+    "repo": "https://github.com/immortalwrt/immortalwrt",
+    "branch": "master",
+    "config": "config/immortalwrt.config",
+    "diy1": "scripts/diy-immortalwrt-part1.sh"
+  },
+  {
+    "id": "lienol",
+    "title": "Lienol's OpenWrt",
+    "repo": "https://github.com/Lienol/openwrt",
+    "branch": "25.12",
+    "config": "config/lienol.config",
+    "diy1": "scripts/diy-noop-part1.sh"
+  },
+  {
+    "id": "openwrt",
+    "title": "Official OpenWrt",
+    "repo": "https://github.com/openwrt/openwrt",
+    "branch": "main",
+    "config": "config/openwrt.config",
+    "diy1": "scripts/diy-noop-part1.sh"
+  }
+]
